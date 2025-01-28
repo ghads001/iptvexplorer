@@ -1,0 +1,152 @@
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<title>IPTV Channel Explorer</title>
+<style>
+  body {
+    font-family: Arial, sans-serif;
+    margin: 0;
+    padding: 0;
+    background-color: #f0f0f0;
+  }
+  .header {
+    background-color: #2c3e50;
+    color: white;
+    padding: 1rem;
+    text-align: center;
+  }
+  .search-bar {
+    display: flex;
+    justify-content: center;
+    padding: 1rem;
+    background-color: #34495e;
+  }
+  .search-bar input {
+    width: 50%;
+    padding: 0.5rem;
+    font-size: 1rem;
+  }
+  .search-bar button {
+    padding: 0.5rem 1rem;
+    background-color: #3498db;
+    color: white;
+    border: none;
+    cursor: pointer;
+  }
+  #channelList {
+    display: grid;
+    grid-template-columns: repeat(auto-fill, minmax(250px, 1fr));
+    gap: 1rem;
+    padding: 1rem;
+  }
+  .channel {
+    background-color: white;
+    border-radius: 5px;
+    box-shadow: 0 2px 5px rgba(0,0,0,0.1);
+    padding: 1rem;
+    text-align: center;
+  }
+  .channel h3 {
+    margin-top: 0;
+  }
+  #videoPlayer {
+    width: 100%;
+    max-width: 800px;
+    margin: 1rem auto;
+    display: none;
+  }
+</style>
+</head>
+<body>
+  <div class="header">
+    <h1>IPTV Channel Explorer</h1>
+    <p>Discover and Watch Live TV Channels</p>
+  </div>
+  
+  <form class="search-bar" method="GET" action="/search">
+    <input type="text" name="query" placeholder="Search channels...">
+    <button type="submit">Search</button>
+  </form>
+  
+  <video id="videoPlayer" controls></video>
+  
+  <div id="channelList"></div>
+
+<script src="https://cdn.jsdelivr.net/npm/hls.js@latest"></script>
+<script>
+let channels = [];
+
+function fetchChannels() {
+  fetch('https://iptv-org.github.io/iptv/index.m3u')
+    .then(response => response.text())
+    .then(data => {
+      channels = parseM3U(data);
+      displayChannels(channels);
+    })
+    .catch(error => console.error('Error:', error));
+}
+
+function parseM3U(data) {
+  const lines = data.split('\n');
+  const channels = [];
+  let currentChannel = {};
+
+  for (let i = 1; i < lines.length; i++) {
+    if (lines[i].startsWith('#EXTINF:')) {
+      const info = lines[i].split(',');
+      currentChannel.name = info[1];
+    } else if (lines[i].trim() !== '' && !lines[i].startsWith('#')) {
+      currentChannel.url = lines[i].trim();
+      channels.push(currentChannel);
+      currentChannel = {};
+    }
+  }
+
+  return channels;
+}
+
+function displayChannels(channelsToDisplay) {
+  const channelList = document.getElementById('channelList');
+  channelList.innerHTML = '';
+  channelsToDisplay.forEach(channel => {
+    const channelElement = document.createElement('div');
+    channelElement.className = 'channel';
+    channelElement.innerHTML = `
+      <h3>${channel.name}</h3>
+      <button onclick="playChannel('${channel.url}')">Watch</button>
+    `;
+    channelList.appendChild(channelElement);
+  });
+}
+
+function playChannel(url) {
+  const video = document.getElementById('videoPlayer');
+  video.style.display = 'block';
+
+  if (Hls.isSupported()) {
+    const hls = new Hls();
+    hls.loadSource(url);
+    hls.attachMedia(video);
+    hls.on(Hls.Events.MANIFEST_PARSED, function() {
+      video.play();
+    });
+  } else if (video.canPlayType('application/vnd.apple.mpegurl')) {
+    video.src = url;
+    video.addEventListener('loadedmetadata', function() {
+      video.play();
+    });
+  }
+}
+
+document.querySelector('form').addEventListener('submit', function(e) {
+  e.preventDefault();
+  const query = document.querySelector('input[name="query"]').value.toLowerCase();
+  const filteredChannels = channels.filter(channel => 
+    channel.name.toLowerCase().includes(query)
+  );
+  displayChannels(filteredChannels);
+});
+
+fetchChannels();
+</script>
+
+</body></html>
